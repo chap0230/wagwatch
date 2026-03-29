@@ -1,0 +1,37 @@
+{
+  "DogTrackerStorage": {
+    "ExportsOutputFnGetAttPhotosBucket2AC9D1F0Arn2A944E00": "arn:aws:s3:::dogtrackerstorage-photosbucket2ac9d1f0-qad1nfjheb2g",
+    "ExportsOutputRefPhotosBucket2AC9D1F073D0C9A7": "dogtrackerstorage-photosbucket2ac9d1f0-qad1nfjheb2g",
+    "PhotosBucketName": "dogtrackerstorage-photosbucket2ac9d1f0-qad1nfjheb2g"
+  },
+  "DogTrackerDatabase": {
+    "ExportsOutputRefEventsD32975C26DE279B4": "dog-tracker-events",
+    "ExportsOutputFnGetAttDogs83E93985ArnEF39EF19": "arn:aws:dynamodb:us-west-2:062328975698:table/dog-tracker-dogs",
+    "ExportsOutputFnGetAttUsers0A0EEA89Arn6658B146": "arn:aws:dynamodb:us-west-2:062328975698:table/dog-tracker-users",
+    "ExportsOutputFnGetAttEventsD32975C2Arn3A906F6E": "arn:aws:dynamodb:us-west-2:062328975698:table/dog-tracker-events",
+    "ExportsOutputFnGetAttChatSessions9675362FArn14DCA242": "arn:aws:dynamodb:us-west-2:062328975698:table/dog-tracker-chat-sessions",
+    "ExportsOutputRefMedications0A1EF4C5134F3E9E": "dog-tracker-medications",
+    "ExportsOutputFnGetAttHouseholds013EF96CArn6643123E": "arn:aws:dynamodb:us-west-2:062328975698:table/dog-tracker-households",
+    "ExportsOutputFnGetAttMedications0A1EF4C5Arn03191B21": "arn:aws:dynamodb:us-west-2:062328975698:table/dog-tracker-medications",
+    "ExportsOutputRefUsers0A0EEA89A1309EA5": "dog-tracker-users",
+    "ExportsOutputRefChatSessions9675362F9BFA51FB": "dog-tracker-chat-sessions",
+    "ExportsOutputRefDogs83E93985180BFB2E": "dog-tracker-dogs",
+    "ExportsOutputRefHouseholds013EF96C571F9996": "dog-tracker-households"
+  },
+  "DogTrackerFrontend": {
+    "ExportsOutputFnGetAttDistribution830FAC52DomainNameBEB09E30": "d15c834imshs8e.cloudfront.net",
+    "BucketName": "dogtrackerfrontend-sitebucket397a1860-mfsa1tnphxrg",
+    "DistributionUrl": "https://d15c834imshs8e.cloudfront.net",
+    "DistributionId": "E2KG94P6VE3D02"
+  },
+  "DogTrackerAuth": {
+    "ExportsOutputFnGetAttUserPool6BA7E5F2Arn686ACC00": "arn:aws:cognito-idp:us-west-2:062328975698:userpool/us-west-2_CE3AKiT3g",
+    "UserPoolClientId": "3hu70m8rhufo7qkarp273nvs7d",
+    "UserPoolId": "us-west-2_CE3AKiT3g",
+    "CognitoDomain": "dog-tracker-062328975698.auth.us-west-2.amazoncognito.com"
+  },
+  "DogTrackerApi": {
+    "ApiEndpoint4F160690": "https://292j1kir26.execute-api.us-west-2.amazonaws.com/prod/",
+    "ApiUrl": "https://292j1kir26.execute-api.us-west-2.amazonaws.com/prod/"
+  }
+}
