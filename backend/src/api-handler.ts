@@ -13,6 +13,12 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
     const { httpMethod: method, resource } = event;
     const body = event.body ? JSON.parse(event.body) : {};
     const params = event.pathParameters || {};
+    console.log('API Handler', { method, resource, params });
+    // Path parameters from API Gateway may be URL-encoded — decode them
+    const decodedParams = Object.fromEntries(
+      Object.entries(params).map(([k, v]) => [k, v ? decodeURIComponent(v) : v])
+    );
+    console.log('Decoded params', decodedParams);
 
     let result: { statusCode: number; data?: any; error?: string };
 
@@ -22,13 +28,13 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
         result = await createHousehold(ctx, body);
         break;
       case 'GET /api/v1/households/{householdId}':
-        result = await getHousehold(params.householdId!, ctx);
+        result = await getHousehold(decodedParams.householdId!, ctx);
         break;
       case 'POST /api/v1/households/{householdId}/invite':
-        result = await createInvite(params.householdId!, ctx);
+        result = await createInvite(decodedParams.householdId!, ctx);
         break;
       case 'POST /api/v1/households/{householdId}/remove-member':
-        result = await removeMember(params.householdId!, ctx, body);
+        result = await removeMember(decodedParams.householdId!, ctx, body);
         break;
       case 'POST /api/v1/households/join':
         result = await joinHousehold(ctx, body);
@@ -42,49 +48,49 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
         result = await listDogs(ctx);
         break;
       case 'GET /api/v1/dogs/{dogId}':
-        result = await getDog(params.dogId!, ctx);
+        result = await getDog(decodedParams.dogId!, ctx);
         break;
       case 'PUT /api/v1/dogs/{dogId}':
-        result = await updateDog(params.dogId!, ctx, body);
+        result = await updateDog(decodedParams.dogId!, ctx, body);
         break;
       case 'POST /api/v1/dogs/{dogId}/photo-upload-url':
-        result = await getPhotoUploadUrl(params.dogId!, ctx, body);
+        result = await getPhotoUploadUrl(decodedParams.dogId!, ctx, body);
         break;
 
       // Events
       case 'POST /api/v1/dogs/{dogId}/events':
-        result = await createEvent(params.dogId!, ctx, body);
+        result = await createEvent(decodedParams.dogId!, ctx, body);
         break;
       case 'GET /api/v1/dogs/{dogId}/events':
-        result = await listEvents(params.dogId!, ctx, event.queryStringParameters || {});
+        result = await listEvents(decodedParams.dogId!, ctx, event.queryStringParameters || {});
         break;
       case 'GET /api/v1/dogs/{dogId}/events/{eventId}':
-        result = await getEvent(params.dogId!, params.eventId!, ctx);
+        result = await getEvent(decodedParams.dogId!, decodedParams.eventId!, ctx);
         break;
       case 'PUT /api/v1/dogs/{dogId}/events/{eventId}':
-        result = await updateEvent(params.dogId!, params.eventId!, ctx, body);
+        result = await updateEvent(decodedParams.dogId!, decodedParams.eventId!, ctx, body);
         break;
       case 'DELETE /api/v1/dogs/{dogId}/events/{eventId}':
-        result = await deleteEvent(params.dogId!, params.eventId!, ctx);
+        result = await deleteEvent(decodedParams.dogId!, decodedParams.eventId!, ctx);
         break;
 
       // Daily Summary
       case 'GET /api/v1/dogs/{dogId}/daily-summary/{date}':
-        result = await getDailySummary(params.dogId!, params.date!, ctx);
+        result = await getDailySummary(decodedParams.dogId!, decodedParams.date!, ctx);
         break;
 
       // Medications
       case 'POST /api/v1/dogs/{dogId}/medications':
-        result = await createMedication(params.dogId!, ctx, body);
+        result = await createMedication(decodedParams.dogId!, ctx, body);
         break;
       case 'GET /api/v1/dogs/{dogId}/medications':
-        result = await listMedications(params.dogId!, ctx, event.queryStringParameters || {});
+        result = await listMedications(decodedParams.dogId!, ctx, event.queryStringParameters || {});
         break;
       case 'PUT /api/v1/dogs/{dogId}/medications/{medicationId}':
-        result = await updateMedication(params.dogId!, params.medicationId!, ctx, body);
+        result = await updateMedication(decodedParams.dogId!, decodedParams.medicationId!, ctx, body);
         break;
       case 'PUT /api/v1/dogs/{dogId}/medications/{medicationId}/stop':
-        result = await stopMedication(params.dogId!, params.medicationId!, ctx);
+        result = await stopMedication(decodedParams.dogId!, decodedParams.medicationId!, ctx);
         break;
 
       default:

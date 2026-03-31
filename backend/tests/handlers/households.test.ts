@@ -42,7 +42,7 @@ describe('households handler', () => {
       ddb.send.mockResolvedValueOnce({ Item: { householdId: 'hh-1', name: 'Test' } });
       const result = await getHousehold('hh-1', ctxWithHousehold);
       expect(result.statusCode).toBe(200);
-      expect(result.data!.name).toBe('Test');
+      expect((result.data as any).name).toBe('Test');
     });
 
     it('returns 403 for wrong household', async () => {

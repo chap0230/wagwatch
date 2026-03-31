@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useDog } from '../contexts/DogContext';
 import { useApi } from '../lib/api';
 import { DAY_RATING_EMOJIS, NIGHT_RATING_EMOJIS, POTTY_LOCATIONS } from '../lib/constants';
+import { localInputToISO, localDateInTz } from '../lib/timezone';
 
 interface Props {
   date?: string;
@@ -15,7 +16,7 @@ const BEHAVIOR_TYPES = ['Excessive licking', 'Extreme tiredness', 'Pacing', 'Whi
 export default function DailySummaryForm({ date, onClose, onSaved }: Props) {
   const { selectedDog } = useDog();
   const api = useApi();
-  const today = date || new Date().toISOString().slice(0, 10);
+  const today = date || localDateInTz();
 
   const [rating, setRating] = useState(3);
   const [accidents, setAccidents] = useState<{ type: 'pee' | 'poop'; location: string }[]>([]);
@@ -31,30 +32,32 @@ export default function DailySummaryForm({ date, onClose, onSaved }: Props) {
     setLoading(true);
     try {
       const dogPath = `/dogs/${selectedDog.dogId}/events`;
-      const occurredAt = `${today}T12:00:00Z`;
+      // Use noon in the user's timezone for the date, so the stored date is correct
+      const occurredAt = localInputToISO(`${today}T12:00`);
+      const localDate = today;
       const promises: Promise<any>[] = [];
 
       // Day rating
-      promises.push(api.post(dogPath, { eventType: 'DAY_RATING', data: { rating }, notes, occurredAt }));
+      promises.push(api.post(dogPath, { eventType: 'DAY_RATING', data: { rating }, notes, occurredAt, localDate }));
 
       // Accidents
       for (const a of accidents) {
-        if (a.location) promises.push(api.post(dogPath, { eventType: 'ACCIDENT', data: a, occurredAt }));
+        if (a.location) promises.push(api.post(dogPath, { eventType: 'ACCIDENT', data: a, occurredAt, localDate }));
       }
 
       // Medical events
       for (const m of medicals) {
-        promises.push(api.post(dogPath, { eventType: 'MEDICAL', data: m, occurredAt }));
+        promises.push(api.post(dogPath, { eventType: 'MEDICAL', data: m, occurredAt, localDate }));
       }
 
       // Behaviors
       for (const b of behaviors) {
-        promises.push(api.post(dogPath, { eventType: 'BEHAVIOR', data: { behaviorType: b }, occurredAt }));
+        promises.push(api.post(dogPath, { eventType: 'BEHAVIOR', data: { behaviorType: b }, occurredAt, localDate }));
       }
 
       // Night note
       if (nightRating) {
-        promises.push(api.post(dogPath, { eventType: 'NIGHT_NOTE', data: { rating: nightRating, description: nightNote || `Night rating: ${nightRating}/5` }, occurredAt }));
+        promises.push(api.post(dogPath, { eventType: 'NIGHT_NOTE', data: { rating: nightRating, description: nightNote || `Night rating: ${nightRating}/5` }, occurredAt, localDate }));
       }
 
       await Promise.all(promises);

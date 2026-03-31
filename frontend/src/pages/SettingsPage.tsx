@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useApi } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
+import { getUserTimezone, setUserTimezone, TIMEZONE_OPTIONS } from '../lib/timezone';
 
 export default function SettingsPage() {
   const api = useApi();
@@ -10,6 +11,7 @@ export default function SettingsPage() {
   const [inviteCode, setInviteCode] = useState('');
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [timezone, setTimezone] = useState(getUserTimezone());
 
   useEffect(() => { fetchHousehold(); }, []);
 
@@ -125,9 +127,27 @@ export default function SettingsPage() {
         </div>
       </section>
 
+      {/* Timezone */}
+      <section className="bg-white rounded-xl p-4 border">
+        <h3 className="font-semibold mb-3">🕐 Time Zone</h3>
+        <p className="text-xs text-gray-400 mb-2">Used for displaying and logging event times</p>
+        <select
+          value={timezone}
+          onChange={e => { setTimezone(e.target.value); setUserTimezone(e.target.value); }}
+          className="w-full px-3 py-2 border rounded-lg text-sm">
+          {TIMEZONE_OPTIONS.map(opt => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
+      </section>
+
       <button onClick={logout} className="w-full py-3 border-2 border-red-200 text-red-600 rounded-lg text-sm font-medium">
         Sign Out
       </button>
+
+      <p className="text-center text-xs text-gray-400 pb-2">
+        🐾 Wag Watch — Keep a close, caring eye on the health trends that keep your dog's tail wagging.
+      </p>
     </div>
   );
 }

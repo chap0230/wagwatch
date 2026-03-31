@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { DAY_RATING_EMOJIS, NIGHT_RATING_EMOJIS, POTTY_LOCATIONS } from '../lib/constants';
 import { useApi } from '../lib/api';
+import { formatInTz, isoToLocalInput, localInputToISO } from '../lib/timezone';
 
 interface Props {
   event: any;
@@ -13,7 +14,7 @@ const MEDICAL_TYPES = ['Diarrhea', 'Vomiting', 'Seizure', 'Limping', 'Loss of ap
 const BEHAVIOR_TYPES = ['Excessive licking', 'Extreme tiredness', 'Pacing', 'Whining', 'Hiding', 'Confusion', 'Loss of interest'];
 
 function formatDateTime(iso: string) {
-  return new Date(iso).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+  return formatInTz(iso, { dateStyle: 'medium', timeStyle: 'short' });
 }
 
 export default function EventDetailModal({ event, onClose, onUpdated, userMap }: Props) {
@@ -21,36 +22,36 @@ export default function EventDetailModal({ event, onClose, onUpdated, userMap }:
   const [editing, setEditing] = useState(false);
   const [data, setData] = useState({ ...event.data });
   const [notes, setNotes] = useState(event.notes || '');
-  const [occurredAt, setOccurredAt] = useState(() => {
-    // Convert ISO to local datetime-local input format (YYYY-MM-DDTHH:mm)
-    const d = new Date(event.occurredAt);
-    const pad = (n: number) => String(n).padStart(2, '0');
-    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-  });
+  const [occurredAt, setOccurredAt] = useState(() => isoToLocalInput(event.occurredAt));
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
   const [deleting, setDeleting] = useState(false);
 
   const enteredByName = userMap?.[event.enteredBy] || event.enteredBy;
 
   async function handleSave() {
     setSaving(true);
+    setSaveError('');
     try {
-      await api.put(`/dogs/${event.dogId}/events/${event.eventId}`, {
+      await api.put(`/dogs/${event.dogId}/events/${encodeURIComponent(event.eventId)}`, {
         data,
         notes: notes || undefined,
-        occurredAt: new Date(occurredAt).toISOString(),
+        occurredAt: localInputToISO(occurredAt),
       });
       onUpdated();
       onClose();
-    } catch { /* ignore */ }
-    finally { setSaving(false); }
+    } catch (err: any) {
+      setSaveError(err.message || 'Save failed. Please try again.');
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function handleDelete() {
     if (!confirm('Delete this entry?')) return;
     setDeleting(true);
     try {
-      await api.del(`/dogs/${event.dogId}/events/${event.eventId}`);
+      await api.del(`/dogs/${event.dogId}/events/${encodeURIComponent(event.eventId)}`);
       onUpdated();
       onClose();
     } catch { /* ignore */ }
@@ -145,6 +146,7 @@ export default function EventDetailModal({ event, onClose, onUpdated, userMap }:
                 {saving ? 'Saving...' : 'Save'}
               </button>
             </div>
+            {saveError && <p className="text-red-500 text-xs text-center">{saveError}</p>}
           </div>
         ) : (
           <div className="space-y-3">

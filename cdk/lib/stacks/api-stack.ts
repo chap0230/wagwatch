@@ -28,7 +28,7 @@ export class ApiStack extends cdk.Stack {
 
     this.apiHandler = new lambda.Function(this, 'ApiHandler', {
       functionName: 'dog-tracker-api',
-      runtime: lambda.Runtime.NODEJS_20_X,
+      runtime: lambda.Runtime.NODEJS_22_X,
       handler: 'api-handler.handler',
       code: lambda.Code.fromAsset(path.join(__dirname, '../../../backend/dist')),
       timeout: cdk.Duration.seconds(15),
@@ -116,7 +116,7 @@ export class ApiStack extends cdk.Stack {
     // Chat (separate Lambda — longer timeout, Bedrock access)
     const chatHandler = new lambda.Function(this, 'ChatHandler', {
       functionName: 'dog-tracker-chat',
-      runtime: lambda.Runtime.NODEJS_20_X,
+      runtime: lambda.Runtime.NODEJS_22_X,
       handler: 'chat-handler.handler',
       code: lambda.Code.fromAsset(path.join(__dirname, '../../../backend/dist')),
       timeout: cdk.Duration.seconds(60),
@@ -127,7 +127,7 @@ export class ApiStack extends cdk.Stack {
         MEDICATIONS_TABLE: props.medicationsTable.tableName,
         USERS_TABLE: props.usersTable.tableName,
         CHAT_SESSIONS_TABLE: props.chatSessionsTable.tableName,
-        MODEL_ID: 'anthropic.claude-3-5-haiku-20241022-v1:0',
+        MODEL_ID: 'us.anthropic.claude-haiku-4-5-20251001-v1:0',
       },
     });
     props.dogsTable.grantReadData(chatHandler);

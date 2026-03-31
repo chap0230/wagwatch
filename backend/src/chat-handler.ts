@@ -12,7 +12,7 @@ const EVENTS_TABLE = process.env.EVENTS_TABLE!;
 const MEDICATIONS_TABLE = process.env.MEDICATIONS_TABLE!;
 const USERS_TABLE = process.env.USERS_TABLE!;
 const CHAT_SESSIONS_TABLE = process.env.CHAT_SESSIONS_TABLE!;
-const MODEL_ID = process.env.MODEL_ID || 'anthropic.claude-3-5-haiku-20241022-v1:0';
+const MODEL_ID = process.env.MODEL_ID || 'us.anthropic.claude-haiku-4-5-20251001-v1:0';
 
 const TOOL_DEFINITIONS = [
   {

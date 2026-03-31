@@ -3,7 +3,7 @@ import * as esbuild from 'esbuild';
 const shared = {
   bundle: true,
   platform: 'node',
-  target: 'node20',
+  target: 'node22',
   format: 'cjs',
   outdir: 'dist',
   external: ['@aws-sdk/*'],

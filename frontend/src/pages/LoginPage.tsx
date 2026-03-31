@@ -30,8 +30,7 @@ export default function LoginPage() {
         <div className="text-center">
           <h1 className="text-2xl font-bold">🐾 Wag Watch</h1>
           <p className="text-gray-500 mt-1 text-xs">Keep a close, caring eye on the health trends that keep your dog's tail wagging.</p>
-          <p className="text-blue-600 mt-2 text-sm font-medium">Sign in to continue</p>
-        </div>
+          <p className="text-blue-600 mt-2 text-sm font-medium">Sign in to continue</p>        </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && <p className="text-red-600 text-sm text-center">{error}</p>}
           <input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)}

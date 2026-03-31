@@ -31,6 +31,7 @@ function validateEventData(eventType: EventType, data: any): string | null {
 }
 
 export async function createEvent(dogId: string, ctx: RequestContext, body: any) {
+  console.log('createEvent called', { dogId, occurredAt: body.occurredAt, localDate: body.localDate, eventType: body.eventType });
   if (!ctx.householdId) return { statusCode: 400, error: 'Must belong to a household' };
   if (!await verifyDogAccess(dogId, ctx.householdId)) return { statusCode: 403, error: 'Forbidden' };
 
@@ -42,7 +43,9 @@ export async function createEvent(dogId: string, ctx: RequestContext, body: any)
 
   const now = new Date().toISOString();
   const occurredAt = body.occurredAt || now;
-  const date = occurredAt.slice(0, 10);
+  // Use explicitly provided localDate if available (sent by frontend in user's timezone),
+  // otherwise fall back to slicing the UTC ISO string
+  const date = body.localDate || occurredAt.slice(0, 10);
 
   // DAY_RATING: upsert — one per dog per day
   if (eventType === 'DAY_RATING') {
@@ -170,8 +173,10 @@ export async function getEvent(dogId: string, eventId: string, ctx: RequestConte
 }
 
 export async function updateEvent(dogId: string, eventId: string, ctx: RequestContext, body: any) {
+  console.log('updateEvent called', { dogId, eventId, bodyKeys: Object.keys(body) });
   if (!ctx.householdId) return { statusCode: 400, error: 'Must belong to a household' };
   const existing = await ddb.send(new GetCommand({ TableName: Tables.events, Key: { dogId, eventId } }));
+  console.log('updateEvent GetCommand result', { found: !!existing.Item, eventId });
   if (!existing.Item) return { statusCode: 404, error: 'Event not found' };
   if (existing.Item.householdId !== ctx.householdId) return { statusCode: 403, error: 'Forbidden' };
 
@@ -208,8 +213,10 @@ export async function updateEvent(dogId: string, eventId: string, ctx: RequestCo
 }
 
 export async function deleteEvent(dogId: string, eventId: string, ctx: RequestContext) {
+  console.log('deleteEvent called', { dogId, eventId });
   if (!ctx.householdId) return { statusCode: 400, error: 'Must belong to a household' };
   const existing = await ddb.send(new GetCommand({ TableName: Tables.events, Key: { dogId, eventId } }));
+  console.log('deleteEvent GetCommand result', { found: !!existing.Item, eventId });
   if (!existing.Item) return { statusCode: 404, error: 'Event not found' };
   if (existing.Item.householdId !== ctx.householdId) return { statusCode: 403, error: 'Forbidden' };
 

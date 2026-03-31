@@ -5,9 +5,10 @@ import QuickLogModal from '../components/QuickLogModal';
 import DailySummaryForm from '../components/DailySummaryForm';
 import EventCard from '../components/EventCard';
 import EventDetailModal from '../components/EventDetailModal';
+import { todayInTz, localInputToISO, localDateInTz } from '../lib/timezone';
 
 function todayStr() {
-  return new Date().toISOString().slice(0, 10);
+  return todayInTz();
 }
 
 function formatDateLabel(dateStr: string) {
@@ -55,7 +56,11 @@ export default function HomePage() {
 
   async function handleQuickLog(event: any) {
     if (!selectedDog) return;
-    await api.post(`/dogs/${selectedDog.dogId}/events`, { ...event, occurredAt: isToday ? undefined : `${date}T12:00:00Z` });
+    // Always send occurredAt as current time in user's timezone, plus localDate so
+    // the backend stores the correct date regardless of UTC offset
+    const occurredAt = isToday ? new Date().toISOString() : localInputToISO(`${date}T12:00`);
+    const localDate = isToday ? localDateInTz() : date;
+    await api.post(`/dogs/${selectedDog.dogId}/events`, { ...event, occurredAt, localDate });
     await fetchDay();
   }
 

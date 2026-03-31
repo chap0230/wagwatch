@@ -1,11 +1,12 @@
 import { DAY_RATING_EMOJIS, NIGHT_RATING_EMOJIS } from '../lib/constants';
+import { formatInTz } from '../lib/timezone';
 
 const ICONS: Record<string, string> = {
   ACCIDENT: '🚽', MEDICAL: '🏥', BEHAVIOR: '🐕', NIGHT_NOTE: '🌙', DAY_RATING: '⭐',
 };
 
 function formatTime(iso: string) {
-  return new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  return formatInTz(iso, { hour: 'numeric', minute: '2-digit' });
 }
 
 function eventSummary(event: any): string {
