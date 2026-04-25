@@ -60,10 +60,14 @@ export default function EventDetailModal({ event, onClose, onUpdated, userMap }:
 
   return (
     <div className="fixed inset-0 bg-black/40 z-[60] flex items-center justify-center px-4" onClick={onClose}>
-      <div className="bg-white w-full max-w-sm rounded-2xl p-5 max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+      <div className="bg-white w-full max-w-sm rounded-2xl p-5 max-h-[85vh] overflow-y-auto overflow-x-hidden" onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold">{event.eventType === 'ACCIDENT' ? 'Potty' : event.eventType.replace('_', ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()).replace('Day Rating', 'Day Rating').replace('Night Note', 'Night Rating')}</h3>
+          <h3 className="font-semibold">{
+            event.eventType === 'ACCIDENT' ? 'Potty' :
+            event.eventType === 'MEAL' ? 'Meal' :
+            event.eventType.replace('_', ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()).replace('Day Rating', 'Day Rating').replace('Night Note', 'Night Rating')
+          }</h3>
           <button onClick={onClose} className="text-gray-400 text-lg">✕</button>
         </div>
 
@@ -132,12 +136,35 @@ export default function EventDetailModal({ event, onClose, onUpdated, userMap }:
                 ))}
               </div>
             )}
+            {event.eventType === 'MEAL' && (
+              <>
+                <div className="flex gap-2">
+                  {(['breakfast', 'dinner'] as const).map(m => (
+                    <button key={m} onClick={() => setData({ ...data, mealType: m })}
+                      className={`flex-1 py-2 rounded-lg border capitalize ${data.mealType === m ? 'bg-blue-50 border-blue-600 text-blue-600' : ''}`}>
+                      {m === 'breakfast' ? '🌅' : '🌙'} {m.charAt(0).toUpperCase() + m.slice(1)}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  {(['all', 'some', 'none'] as const).map(a => (
+                    <button key={a} onClick={() => setData({ ...data, amount: a })}
+                      className={`flex-1 py-2 rounded-lg border capitalize ${data.amount === a ? 'bg-blue-50 border-blue-600 text-blue-600' : ''}`}>
+                      {a === 'all' ? '😋' : a === 'some' ? '😐' : '😞'} {a.charAt(0).toUpperCase() + a.slice(1)}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
             <textarea placeholder="Notes" value={notes} onChange={e => setNotes(e.target.value)}
               rows={2} className="w-full px-3 py-2 border rounded-lg text-sm" />
             <div>
               <label className="text-xs text-gray-400 block mb-1">Date &amp; Time</label>
-              <input type="datetime-local" value={occurredAt} onChange={e => setOccurredAt(e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg text-sm" />
+              <div className="w-full overflow-hidden">
+                <input type="datetime-local" value={occurredAt} onChange={e => setOccurredAt(e.target.value)}
+                  className="w-full min-w-0 px-2 py-2 border rounded-lg text-sm"
+                  style={{ maxWidth: '100%', boxSizing: 'border-box' }} />
+              </div>
             </div>
             <div className="flex gap-2">
               <button onClick={() => setEditing(false)} className="flex-1 py-2 border rounded-lg text-sm">Cancel</button>
@@ -175,10 +202,15 @@ export default function EventDetailModal({ event, onClose, onUpdated, userMap }:
             {event.eventType === 'DAY_RATING' && (
               <Detail label="Rating" value={`${DAY_RATING_EMOJIS[event.data.rating]} ${event.data.rating}/5`} />
             )}
+            {event.eventType === 'MEAL' && (
+              <>
+                <Detail label="Meal" value={event.data.mealType === 'breakfast' ? '🌅 Breakfast' : '🌙 Dinner'} />
+                <Detail label="Amount eaten" value={event.data.amount === 'all' ? '😋 All' : event.data.amount === 'some' ? '😐 Some' : '😞 None'} />
+              </>
+            )}
             {event.notes && <Detail label="Notes" value={event.notes} />}
             <Detail label="Time" value={formatDateTime(event.occurredAt)} />
             <Detail label="Entered by" value={enteredByName} />
-            <Detail label="Date" value={event.date} />
 
             <div className="flex gap-2 mt-2">
               <button onClick={() => setEditing(true)}

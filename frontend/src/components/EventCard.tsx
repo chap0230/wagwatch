@@ -2,7 +2,7 @@ import { DAY_RATING_EMOJIS, NIGHT_RATING_EMOJIS } from '../lib/constants';
 import { formatInTz } from '../lib/timezone';
 
 const ICONS: Record<string, string> = {
-  ACCIDENT: '🚽', MEDICAL: '🏥', BEHAVIOR: '🐕', NIGHT_NOTE: '🌙', DAY_RATING: '⭐',
+  ACCIDENT: '🚽', MEDICAL: '🏥', BEHAVIOR: '🐕', NIGHT_NOTE: '🌙', DAY_RATING: '⭐', MEAL: '🍽️',
 };
 
 function formatTime(iso: string) {
@@ -20,6 +20,11 @@ function eventSummary(event: any): string {
       return d.rating ? `${emoji} ${d.rating}/5` : d.description;
     }
     case 'DAY_RATING': return `${DAY_RATING_EMOJIS[d.rating] || ''} ${d.rating}/5`;
+    case 'MEAL': {
+      const meal = d.mealType === 'breakfast' ? '🌅 Breakfast' : '🌙 Dinner';
+      const amount = d.amount === 'all' ? '😋 All' : d.amount === 'some' ? '😐 Some' : '😞 None';
+      return `${meal} — ${amount}`;
+    }
     default: return '';
   }
 }

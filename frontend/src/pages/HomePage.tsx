@@ -3,6 +3,7 @@ import { useDog } from '../contexts/DogContext';
 import { useApi } from '../lib/api';
 import QuickLogModal from '../components/QuickLogModal';
 import DailySummaryForm from '../components/DailySummaryForm';
+import DayRatingPrompt from '../components/DayRatingPrompt';
 import EventCard from '../components/EventCard';
 import EventDetailModal from '../components/EventDetailModal';
 import { todayInTz, localInputToISO, localDateInTz } from '../lib/timezone';
@@ -11,11 +12,21 @@ function todayStr() {
   return todayInTz();
 }
 
+function yesterdayStr() {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return localDateInTz(d.toISOString());
+}
+
+function dismissKey(dogId: string, date: string) {
+  return `wagwatch_rating_dismissed_${dogId}_${date}`;
+}
+
 function formatDateLabel(dateStr: string) {
-  const today = todayStr();
+  const today = todayInTz();
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
-  const yesterdayStr = yesterday.toISOString().slice(0, 10);
+  const yesterdayStr = localDateInTz(yesterday.toISOString());
 
   if (dateStr === today) return 'Today';
   if (dateStr === yesterdayStr) return 'Yesterday';
@@ -31,6 +42,21 @@ export default function HomePage() {
   const [loading, setLoading] = useState(false);
   const [showDailySummary, setShowDailySummary] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
+  const [showYesterdayPrompt, setShowYesterdayPrompt] = useState(false);
+
+  // Check if yesterday has a day rating — show prompt if not and not already dismissed
+  useEffect(() => {
+    if (!selectedDog) return;
+    const yesterday = yesterdayStr();
+    const key = dismissKey(selectedDog.dogId, yesterday);
+    if (localStorage.getItem(key)) return; // already dismissed today
+
+    api.get(`/dogs/${selectedDog.dogId}/daily-summary/${yesterday}`)
+      .then(data => {
+        if (!data.dayRating) setShowYesterdayPrompt(true);
+      })
+      .catch(() => {});
+  }, [selectedDog?.dogId]);
 
   const isToday = date === todayStr();
 
@@ -38,8 +64,27 @@ export default function HomePage() {
     if (!selectedDog) return;
     setLoading(true);
     try {
-      const data = await api.get(`/dogs/${selectedDog.dogId}/daily-summary/${date}`);
-      setEvents(data.events || []);
+      // The backend groups by UTC date, which can differ from the user's local date.
+      // Fetch both the local date AND the next UTC date to catch events logged near midnight.
+      const nextDate = new Date(date + 'T12:00:00');
+      nextDate.setDate(nextDate.getDate() + 1);
+      const nextDateStr = nextDate.toISOString().slice(0, 10);
+
+      const [data, nextData] = await Promise.all([
+        api.get(`/dogs/${selectedDog.dogId}/daily-summary/${date}`),
+        api.get(`/dogs/${selectedDog.dogId}/daily-summary/${nextDateStr}`),
+      ]);
+
+      // Merge and deduplicate, then filter to only events whose local date matches
+      const allEvents: any[] = [...(data.events || []), ...(nextData.events || [])];
+      const seen = new Set<string>();
+      const merged = allEvents.filter(e => {
+        if (seen.has(e.eventId)) return false;
+        seen.add(e.eventId);
+        return localDateInTz(e.occurredAt) === date;
+      });
+
+      setEvents(merged);
       setDayRating(data.dayRating);
     } catch { /* ignore */ }
     finally { setLoading(false); }
@@ -56,10 +101,10 @@ export default function HomePage() {
 
   async function handleQuickLog(event: any) {
     if (!selectedDog) return;
-    // Always send occurredAt as current time in user's timezone, plus localDate so
-    // the backend stores the correct date regardless of UTC offset
-    const occurredAt = isToday ? new Date().toISOString() : localInputToISO(`${date}T12:00`);
-    const localDate = isToday ? localDateInTz() : date;
+    // Use occurredAt from the modal (user may have adjusted the time).
+    // For past days without a modal-provided time, default to noon in user's timezone.
+    const occurredAt = event.occurredAt ?? (isToday ? new Date().toISOString() : localInputToISO(`${date}T12:00`));
+    const localDate = localDateInTz(occurredAt);
     await api.post(`/dogs/${selectedDog.dogId}/events`, { ...event, occurredAt, localDate });
     await fetchDay();
   }
@@ -77,6 +122,21 @@ export default function HomePage() {
 
   return (
     <div>
+      {/* Yesterday rating prompt */}
+      {showYesterdayPrompt && selectedDog && (
+        <DayRatingPrompt
+          yesterday={yesterdayStr()}
+          onDismiss={() => {
+            localStorage.setItem(dismissKey(selectedDog.dogId, yesterdayStr()), '1');
+            setShowYesterdayPrompt(false);
+          }}
+          onSaved={() => {
+            localStorage.setItem(dismissKey(selectedDog.dogId, yesterdayStr()), '1');
+            setShowYesterdayPrompt(false);
+          }}
+        />
+      )}
+
       {/* Date navigation */}
       <div className="flex items-center justify-between mb-4">
         <button onClick={() => goDay(-1)} className="p-2 text-lg text-blue-600">‹</button>

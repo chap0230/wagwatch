@@ -3,7 +3,7 @@ import { PutCommand, GetCommand, UpdateCommand, DeleteCommand, QueryCommand } fr
 import { v4 as uuid } from 'uuid';
 import { RequestContext, verifyDogAccess } from '../auth-context';
 
-const EVENT_TYPES = ['ACCIDENT', 'MEDICAL', 'BEHAVIOR', 'NIGHT_NOTE', 'DAY_RATING'] as const;
+const EVENT_TYPES = ['ACCIDENT', 'MEDICAL', 'BEHAVIOR', 'NIGHT_NOTE', 'DAY_RATING', 'MEAL'] as const;
 type EventType = typeof EVENT_TYPES[number];
 
 function validateEventData(eventType: EventType, data: any): string | null {
@@ -24,6 +24,10 @@ function validateEventData(eventType: EventType, data: any): string | null {
       return null;
     case 'DAY_RATING':
       if (!data?.rating || data.rating < 1 || data.rating > 5) return 'data.rating must be 1-5';
+      return null;
+    case 'MEAL':
+      if (!data?.mealType || !['breakfast', 'dinner'].includes(data.mealType)) return 'data.mealType must be "breakfast" or "dinner"';
+      if (!data?.amount || !['all', 'some', 'none'].includes(data.amount)) return 'data.amount must be "all", "some", or "none"';
       return null;
     default:
       return 'Invalid eventType';

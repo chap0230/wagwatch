@@ -136,8 +136,11 @@ export class ApiStack extends cdk.Stack {
     props.usersTable.grantReadData(chatHandler);
     props.chatSessionsTable.grantReadWriteData(chatHandler);
     chatHandler.addToRolePolicy(new iam.PolicyStatement({
-      actions: ['bedrock:InvokeModel'],
-      resources: ['arn:aws:bedrock:*::foundation-model/anthropic.*'],
+      actions: ['bedrock:InvokeModel', 'bedrock:InvokeModelWithResponseStream'],
+      resources: [
+        'arn:aws:bedrock:*::foundation-model/anthropic.*',
+        'arn:aws:bedrock:*:*:inference-profile/*',
+      ],
     }));
 
     const chatIntegration = new apigateway.LambdaIntegration(chatHandler);

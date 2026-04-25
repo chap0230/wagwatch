@@ -6,8 +6,9 @@ import EventCard from '../components/EventCard';
 import CalendarHeatmap from '../components/CalendarHeatmap';
 import ExportBar from '../components/ExportBar';
 import EventDetailModal from '../components/EventDetailModal';
+import { todayInTz, localDateInTz } from '../lib/timezone';
 
-type EventType = 'ACCIDENT' | 'MEDICAL' | 'BEHAVIOR' | 'NIGHT_NOTE' | 'DAY_RATING' | '';
+type EventType = 'ACCIDENT' | 'MEDICAL' | 'BEHAVIOR' | 'NIGHT_NOTE' | 'DAY_RATING' | 'MEAL' | '';
 
 export default function HistoryPage() {
   const { selectedDog, userMap } = useDog();
@@ -19,17 +20,28 @@ export default function HistoryPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
   const [dateRange, setDateRange] = useState(() => {
-    const end = new Date();
-    const start = new Date();
-    start.setDate(start.getDate() - 90);
-    return { start: start.toISOString().slice(0, 10), end: end.toISOString().slice(0, 10) };
+    const end = todayInTz();
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - 90);
+    const start = localDateInTz(startDate.toISOString());
+    return { start, end };
   });
 
   const fetchEvents = useCallback(async () => {
     if (!selectedDog) return;
     setLoading(true);
     try {
-      const params = new URLSearchParams({ startDate: dateRange.start, endDate: dateRange.end });
+      // Widen the date range by 1 day on each side to catch events near midnight
+      // whose UTC date differs from the local date. Client-side filtering handles display.
+      const startPadded = new Date(dateRange.start + 'T12:00:00');
+      startPadded.setDate(startPadded.getDate() - 1);
+      const endPadded = new Date(dateRange.end + 'T12:00:00');
+      endPadded.setDate(endPadded.getDate() + 1);
+
+      const params = new URLSearchParams({
+        startDate: startPadded.toISOString().slice(0, 10),
+        endDate: endPadded.toISOString().slice(0, 10),
+      });
       if (filterType) params.set('eventType', filterType);
       const data = await api.get(`/dogs/${selectedDog.dogId}/events?${params}`);
       setEvents(data);
@@ -41,13 +53,20 @@ export default function HistoryPage() {
 
   if (!selectedDog) return <p className="text-gray-500 text-center py-8">Select a dog first</p>;
 
-  // Build day ratings map for heatmap
+  // Build day ratings map for heatmap — key by local date derived from occurredAt
   const dayRatings: Record<string, number> = {};
-  events.filter(e => e.eventType === 'DAY_RATING').forEach(e => { dayRatings[e.date] = e.data.rating; });
+  events.filter(e => e.eventType === 'DAY_RATING').forEach(e => {
+    const localDate = localDateInTz(e.occurredAt);
+    dayRatings[localDate] = e.data.rating;
+  });
 
-  // Filter events for display
-  let displayEvents = events.filter(e => e.eventType !== 'DAY_RATING');
-  if (selectedDate) displayEvents = displayEvents.filter(e => e.date === selectedDate);
+  // Filter events for display — use occurredAt local date instead of stored date field
+  let displayEvents = events.filter(e => {
+    if (e.eventType === 'DAY_RATING') return false;
+    const localDate = localDateInTz(e.occurredAt);
+    return localDate >= dateRange.start && localDate <= dateRange.end;
+  });
+  if (selectedDate) displayEvents = displayEvents.filter(e => localDateInTz(e.occurredAt) === selectedDate);
   if (searchTerm) {
     const term = searchTerm.toLowerCase();
     displayEvents = displayEvents.filter(e =>
@@ -74,6 +93,7 @@ export default function HistoryPage() {
           className="flex-1 px-3 py-2 border rounded-lg text-sm">
           <option value="">All types</option>
           <option value="ACCIDENT">🚽 Accidents</option>
+          <option value="MEAL">🍽️ Meals</option>
           <option value="MEDICAL">🏥 Medical</option>
           <option value="BEHAVIOR">🐕 Behavior</option>
           <option value="NIGHT_NOTE">🌙 Night Notes</option>
@@ -84,7 +104,9 @@ export default function HistoryPage() {
 
       {selectedDate && (
         <div className="flex items-center justify-between bg-blue-50 px-3 py-2 rounded-lg">
-          <span className="text-sm text-blue-700">Showing: {selectedDate}</span>
+          <span className="text-sm text-blue-700">
+            Showing: {new Date(selectedDate + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+          </span>
           <button onClick={() => setSelectedDate(null)} className="text-blue-600 text-sm">Clear</button>
         </div>
       )}

@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { DAY_RATING_EMOJIS, NIGHT_RATING_EMOJIS, POTTY_LOCATIONS } from '../lib/constants';
+import { isoToLocalInput, localInputToISO } from '../lib/timezone';
 
-type EventType = 'ACCIDENT' | 'MEDICAL' | 'BEHAVIOR' | 'NIGHT_NOTE' | 'DAY_RATING';
+type EventType = 'ACCIDENT' | 'MEDICAL' | 'BEHAVIOR' | 'NIGHT_NOTE' | 'DAY_RATING' | 'MEAL';
 
 interface QuickLogProps {
   onSubmit: (event: { eventType: EventType; data: any; notes?: string; occurredAt?: string }) => Promise<void>;
@@ -9,6 +10,7 @@ interface QuickLogProps {
 
 const EVENT_OPTIONS: { type: EventType; icon: string; label: string }[] = [
   { type: 'ACCIDENT', icon: '🚽', label: 'Potty' },
+  { type: 'MEAL', icon: '🍽️', label: 'Meals' },
   { type: 'MEDICAL', icon: '🏥', label: 'Medical' },
   { type: 'BEHAVIOR', icon: '🐕', label: 'Behavior' },
   { type: 'NIGHT_NOTE', icon: '🌙', label: 'Night Rating' },
@@ -24,9 +26,12 @@ export default function QuickLogModal({ onSubmit }: QuickLogProps) {
   const [eventType, setEventType] = useState<EventType | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // Datetime picker — defaults to current local datetime (YYYY-MM-DDTHH:mm)
+  const [eventDatetime, setEventDatetime] = useState(() => isoToLocalInput(new Date().toISOString()));
+
   // Form state
   const [accidentType, setAccidentType] = useState<'pee' | 'poop'>('pee');
-  const [location, setLocation] = useState<string>('Inside');
+  const [location, setLocation] = useState<string>('Outside');
   const [medicalType, setMedicalType] = useState(MEDICAL_TYPES[0]);
   const [customMedical, setCustomMedical] = useState('');
   const [severity, setSeverity] = useState('');
@@ -34,23 +39,33 @@ export default function QuickLogModal({ onSubmit }: QuickLogProps) {
   const [customBehavior, setCustomBehavior] = useState('');
   const [nightRating, setNightRating] = useState(3);
   const [rating, setRating] = useState(3);
+  const [mealType, setMealType] = useState<'breakfast' | 'dinner'>('breakfast');
+  const [mealAmount, setMealAmount] = useState<'all' | 'some' | 'none'>('all');
   const [notes, setNotes] = useState('');
 
   function reset() {
     setStep('select');
     setEventType(null);
-    setLocation('Inside');
+    setLocation('Outside');
     setCustomMedical('');
     setSeverity('');
     setCustomBehavior('');
     setNightRating(3);
     setRating(3);
+    setMealType('breakfast');
+    setMealAmount('all');
     setNotes('');
+    setEventDatetime(isoToLocalInput(new Date().toISOString()));
     setLoading(false);
   }
 
   function close() { setOpen(false); reset(); }
-  function selectType(type: EventType) { setEventType(type); setStep('form'); }
+  function selectType(type: EventType) {
+    // Reset datetime to now each time a new event type is selected
+    setEventDatetime(isoToLocalInput(new Date().toISOString()));
+    setEventType(type);
+    setStep('form');
+  }
 
   async function handleSubmit() {
     if (!eventType) return;
@@ -63,9 +78,12 @@ export default function QuickLogModal({ onSubmit }: QuickLogProps) {
         case 'BEHAVIOR': data = { behaviorType: customBehavior || behaviorType }; break;
         case 'NIGHT_NOTE': data = { rating: nightRating, description: notes || `Night rating: ${nightRating}/5` }; break;
         case 'DAY_RATING': data = { rating }; break;
+        case 'MEAL': data = { mealType, amount: mealAmount }; break;
       }
       const submitNotes = eventType === 'NIGHT_NOTE' ? undefined : (notes || undefined);
-      await onSubmit({ eventType, data, notes: submitNotes });
+      // Build occurredAt from the chosen datetime in user's timezone
+      const occurredAt = localInputToISO(eventDatetime);
+      await onSubmit({ eventType, data, notes: submitNotes, occurredAt });
       close();
     } catch { setLoading(false); }
   }
@@ -81,7 +99,7 @@ export default function QuickLogModal({ onSubmit }: QuickLogProps) {
 
   return (
     <div className="fixed inset-0 bg-black/40 z-[60] flex items-end justify-center" onClick={close}>
-      <div className="bg-white w-full max-w-lg rounded-t-2xl p-5 pb-8 max-h-[80vh] overflow-y-auto mb-0" onClick={e => e.stopPropagation()}>
+      <div className="bg-white w-full max-w-lg rounded-t-2xl p-5 pb-8 max-h-[85vh] overflow-y-auto overflow-x-hidden" onClick={e => e.stopPropagation()}>
         {step === 'select' ? (
           <>
             <h3 className="text-lg font-semibold mb-4">Log an event</h3>
@@ -189,8 +207,44 @@ export default function QuickLogModal({ onSubmit }: QuickLogProps) {
                 </>
               )}
 
+              {eventType === 'MEAL' && (
+                <>
+                  <div>
+                    <p className="text-sm text-gray-500 mb-2">Which meal?</p>
+                    <div className="flex gap-2">
+                      {(['breakfast', 'dinner'] as const).map(m => (
+                        <button key={m} onClick={() => setMealType(m)}
+                          className={`flex-1 py-3 rounded-lg border capitalize ${mealType === m ? 'bg-blue-50 border-blue-600 text-blue-600' : ''}`}>
+                          {m === 'breakfast' ? '🌅' : '🌙'} {m.charAt(0).toUpperCase() + m.slice(1)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500 mb-2">How much did they eat?</p>
+                    <div className="flex gap-2">
+                      {(['all', 'some', 'none'] as const).map(a => (
+                        <button key={a} onClick={() => setMealAmount(a)}
+                          className={`flex-1 py-3 rounded-lg border capitalize ${mealAmount === a ? 'bg-blue-50 border-blue-600 text-blue-600' : ''}`}>
+                          {a === 'all' ? '😋' : a === 'some' ? '😐' : '😞'} {a.charAt(0).toUpperCase() + a.slice(1)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+
               <textarea placeholder="Notes (optional)" value={notes} onChange={e => setNotes(e.target.value)}
                 rows={2} className="w-full px-3 py-3 border rounded-lg" />
+
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">Date &amp; time of event</label>
+                <div className="w-full overflow-hidden">
+                  <input type="datetime-local" value={eventDatetime} onChange={e => setEventDatetime(e.target.value)}
+                    className="w-full min-w-0 px-2 py-2.5 border rounded-lg text-sm"
+                    style={{ maxWidth: '100%', boxSizing: 'border-box' }} />
+                </div>
+              </div>
 
               <button onClick={handleSubmit} disabled={loading}
                 className="w-full py-3 bg-blue-600 text-white rounded-lg font-medium disabled:opacity-50">

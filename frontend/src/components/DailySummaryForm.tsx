@@ -20,6 +20,7 @@ export default function DailySummaryForm({ date, onClose, onSaved }: Props) {
 
   const [rating, setRating] = useState(3);
   const [accidents, setAccidents] = useState<{ type: 'pee' | 'poop'; location: string }[]>([]);
+  const [meals, setMeals] = useState<{ mealType: 'breakfast' | 'dinner'; amount: 'all' | 'some' | 'none' }[]>([]);
   const [medicals, setMedicals] = useState<{ medicalType: string; severity: string }[]>([]);
   const [behaviors, setBehaviors] = useState<string[]>([]);
   const [nightRating, setNightRating] = useState(3);
@@ -39,6 +40,11 @@ export default function DailySummaryForm({ date, onClose, onSaved }: Props) {
 
       // Day rating
       promises.push(api.post(dogPath, { eventType: 'DAY_RATING', data: { rating }, notes, occurredAt, localDate }));
+
+      // Meals
+      for (const m of meals) {
+        promises.push(api.post(dogPath, { eventType: 'MEAL', data: m, occurredAt, localDate }));
+      }
 
       // Accidents
       for (const a of accidents) {
@@ -86,11 +92,41 @@ export default function DailySummaryForm({ date, onClose, onSaved }: Props) {
             </div>
           </section>
 
+          {/* Meals */}
+          <section>
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-medium text-gray-700">🍽️ Meals</label>
+              <button onClick={() => setMeals([...meals, { mealType: 'breakfast', amount: 'all' }])}
+                className="text-blue-600 text-sm">+ Add</button>
+            </div>
+            {meals.map((m, i) => (
+              <div key={i} className="flex gap-2 mt-2 items-center">
+                <div className="flex gap-1 flex-1">
+                  {(['breakfast', 'dinner'] as const).map(t => (
+                    <button key={t} type="button" onClick={() => { const n = [...meals]; n[i].mealType = t; setMeals(n); }}
+                      className={`flex-1 py-2 rounded-lg border text-xs ${m.mealType === t ? 'bg-blue-50 border-blue-600 text-blue-600' : ''}`}>
+                      {t === 'breakfast' ? '🌅' : '🌙'} {t.charAt(0).toUpperCase() + t.slice(1)}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex gap-1 flex-1">
+                  {(['all', 'some', 'none'] as const).map(a => (
+                    <button key={a} type="button" onClick={() => { const n = [...meals]; n[i].amount = a; setMeals(n); }}
+                      className={`flex-1 py-2 rounded-lg border text-xs ${m.amount === a ? 'bg-blue-50 border-blue-600 text-blue-600' : ''}`}>
+                      {a.charAt(0).toUpperCase() + a.slice(1)}
+                    </button>
+                  ))}
+                </div>
+                <button onClick={() => setMeals(meals.filter((_, j) => j !== i))} className="text-red-400 text-sm">✕</button>
+              </div>
+            ))}
+          </section>
+
           {/* Potty */}
           <section>
             <div className="flex items-center justify-between">
               <label className="text-sm font-medium text-gray-700">🚽 Potty</label>
-              <button onClick={() => setAccidents([...accidents, { type: 'pee', location: 'Inside' }])}
+              <button onClick={() => setAccidents([...accidents, { type: 'pee', location: 'Outside' }])}
                 className="text-blue-600 text-sm">+ Add</button>
             </div>
             {accidents.map((a, i) => (
