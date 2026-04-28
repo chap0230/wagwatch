@@ -2,26 +2,33 @@ import { ddb, Tables } from '../db';
 import { PutCommand, GetCommand, UpdateCommand, DeleteCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
 import { v4 as uuid } from 'uuid';
 import { RequestContext, verifyDogAccess } from '../auth-context';
+import { LIMITS, validateOptionalString, validateIsoDate, validateOccurredAt } from '../validation';
 
 const EVENT_TYPES = ['ACCIDENT', 'MEDICAL', 'BEHAVIOR', 'NIGHT_NOTE', 'DAY_RATING', 'MEAL'] as const;
 type EventType = typeof EVENT_TYPES[number];
+
+function checkStr(value: unknown, field: string, max: number): string | null {
+  if (typeof value !== 'string') return `${field} must be a string`;
+  if (value.length > max) return `${field} must be ${max} characters or fewer`;
+  return null;
+}
 
 function validateEventData(eventType: EventType, data: any): string | null {
   switch (eventType) {
     case 'ACCIDENT':
       if (!data?.type || !['pee', 'poop'].includes(data.type)) return 'data.type must be "pee" or "poop"';
       if (!data.location) return 'data.location is required';
-      return null;
+      return checkStr(data.location, 'data.location', LIMITS.mediumText);
     case 'MEDICAL':
       if (!data?.medicalType) return 'data.medicalType is required';
       if (data.severity && !['mild', 'moderate', 'severe'].includes(data.severity)) return 'data.severity must be mild/moderate/severe';
-      return null;
+      return checkStr(data.medicalType, 'data.medicalType', LIMITS.mediumText);
     case 'BEHAVIOR':
       if (!data?.behaviorType) return 'data.behaviorType is required';
-      return null;
+      return checkStr(data.behaviorType, 'data.behaviorType', LIMITS.mediumText);
     case 'NIGHT_NOTE':
       if (!data?.description) return 'data.description is required';
-      return null;
+      return checkStr(data.description, 'data.description', LIMITS.longText);
     case 'DAY_RATING':
       if (!data?.rating || data.rating < 1 || data.rating > 5) return 'data.rating must be 1-5';
       return null;
@@ -35,7 +42,6 @@ function validateEventData(eventType: EventType, data: any): string | null {
 }
 
 export async function createEvent(dogId: string, ctx: RequestContext, body: any) {
-  console.log('createEvent called', { dogId, occurredAt: body.occurredAt, localDate: body.localDate, eventType: body.eventType });
   if (!ctx.householdId) return { statusCode: 400, error: 'Must belong to a household' };
   if (!await verifyDogAccess(dogId, ctx.householdId)) return { statusCode: 403, error: 'Forbidden' };
 
@@ -44,6 +50,14 @@ export async function createEvent(dogId: string, ctx: RequestContext, body: any)
 
   const validationError = validateEventData(eventType, body.data);
   if (validationError) return { statusCode: 400, error: validationError };
+  const notesError = validateOptionalString(body.notes, 'notes', LIMITS.longText);
+  if (notesError) return { statusCode: 400, error: notesError };
+  const occurredAtError = validateOccurredAt(body.occurredAt, 'occurredAt');
+  if (occurredAtError) return { statusCode: 400, error: occurredAtError };
+  if (body.localDate !== undefined) {
+    const localDateError = validateIsoDate(body.localDate, 'localDate');
+    if (localDateError) return { statusCode: 400, error: localDateError };
+  }
 
   const now = new Date().toISOString();
   const occurredAt = body.occurredAt || now;
@@ -177,15 +191,21 @@ export async function getEvent(dogId: string, eventId: string, ctx: RequestConte
 }
 
 export async function updateEvent(dogId: string, eventId: string, ctx: RequestContext, body: any) {
-  console.log('updateEvent called', { dogId, eventId, bodyKeys: Object.keys(body) });
   if (!ctx.householdId) return { statusCode: 400, error: 'Must belong to a household' };
   const existing = await ddb.send(new GetCommand({ TableName: Tables.events, Key: { dogId, eventId } }));
-  console.log('updateEvent GetCommand result', { found: !!existing.Item, eventId });
   if (!existing.Item) return { statusCode: 404, error: 'Event not found' };
   if (existing.Item.householdId !== ctx.householdId) return { statusCode: 403, error: 'Forbidden' };
 
   if (body.data) {
     const err = validateEventData(existing.Item.eventType, body.data);
+    if (err) return { statusCode: 400, error: err };
+  }
+  if (body.notes !== undefined) {
+    const err = validateOptionalString(body.notes, 'notes', LIMITS.longText);
+    if (err) return { statusCode: 400, error: err };
+  }
+  if (body.occurredAt !== undefined) {
+    const err = validateOccurredAt(body.occurredAt, 'occurredAt');
     if (err) return { statusCode: 400, error: err };
   }
 
@@ -217,10 +237,8 @@ export async function updateEvent(dogId: string, eventId: string, ctx: RequestCo
 }
 
 export async function deleteEvent(dogId: string, eventId: string, ctx: RequestContext) {
-  console.log('deleteEvent called', { dogId, eventId });
   if (!ctx.householdId) return { statusCode: 400, error: 'Must belong to a household' };
   const existing = await ddb.send(new GetCommand({ TableName: Tables.events, Key: { dogId, eventId } }));
-  console.log('deleteEvent GetCommand result', { found: !!existing.Item, eventId });
   if (!existing.Item) return { statusCode: 404, error: 'Event not found' };
   if (existing.Item.householdId !== ctx.householdId) return { statusCode: 403, error: 'Forbidden' };
 

@@ -37,7 +37,8 @@ describe('chat-handler', () => {
 
     const result = await handler(mockEvent('POST', '/api/v1/dogs/{dogId}/chat', { body: {} }));
     expect(result.statusCode).toBe(400);
-    expect(JSON.parse(result.body).error).toBe('message is required');
+    // Error shape matches the API handler: { error: { code, message } }
+    expect(JSON.parse(result.body).error).toEqual({ code: 'BAD_REQUEST', message: 'message is required' });
   });
 
   it('returns 403 for wrong household', async () => {

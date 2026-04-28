@@ -1,14 +1,16 @@
 import { ddb, Tables } from '../db';
-import { PutCommand, GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
+import { PutCommand, GetCommand, UpdateCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
 import { v4 as uuid } from 'uuid';
+import { randomBytes } from 'crypto';
 import { RequestContext } from '../auth-context';
 
+// 12 bytes of randomness → 16 base64url characters (~96 bits of entropy).
+// base64url is URL-safe and avoids ambiguous characters like '+', '/', '='.
 function generateInviteCode(): string {
-  return uuid().slice(0, 8).toUpperCase();
+  return randomBytes(12).toString('base64url');
 }
 
 async function getHouseholdMembers(householdId: string) {
-  const { QueryCommand } = await import('@aws-sdk/lib-dynamodb');
   const result = await ddb.send(new QueryCommand({
     TableName: Tables.users,
     IndexName: 'householdId-index',
@@ -72,10 +74,12 @@ export async function joinHousehold(ctx: RequestContext, body: { inviteCode: str
   if (!body?.inviteCode) return { statusCode: 400, error: 'inviteCode is required' };
   if (ctx.householdId) return { statusCode: 400, error: 'Already in a household' };
 
-  const { Items } = await scanForInviteCode(body.inviteCode);
+  const { Items } = await queryByInviteCode(body.inviteCode);
   if (!Items?.length) return { statusCode: 404, error: 'Invalid invite code' };
 
   const household = Items[0];
+
+  // Associate the joining user with the household
   await ddb.send(new UpdateCommand({
     TableName: Tables.users,
     Key: { userId: ctx.userId },
@@ -83,15 +87,24 @@ export async function joinHousehold(ctx: RequestContext, body: { inviteCode: str
     ExpressionAttributeValues: { ':hid': household.householdId },
   }));
 
+  // Invalidate the invite code so it can't be reused. A new one can be
+  // generated from the household page if needed.
+  await ddb.send(new UpdateCommand({
+    TableName: Tables.households,
+    Key: { householdId: household.householdId },
+    UpdateExpression: 'REMOVE inviteCode',
+  }));
+
   return { statusCode: 200, data: { householdId: household.householdId, name: household.name } };
 }
 
-async function scanForInviteCode(inviteCode: string) {
-  const { ScanCommand } = await import('@aws-sdk/lib-dynamodb');
-  return ddb.send(new ScanCommand({
+async function queryByInviteCode(inviteCode: string) {
+  return ddb.send(new QueryCommand({
     TableName: Tables.households,
-    FilterExpression: 'inviteCode = :code',
+    IndexName: 'inviteCode-index',
+    KeyConditionExpression: 'inviteCode = :code',
     ExpressionAttributeValues: { ':code': inviteCode },
+    Limit: 1,
   }));
 }
 
@@ -125,12 +138,30 @@ export async function removeMember(householdId: string, ctx: RequestContext, bod
     return { statusCode: 404, error: 'User not found in household' };
   }
 
-  // Remove household association
-  await ddb.send(new UpdateCommand({
-    TableName: Tables.users,
-    Key: { userId: body.userId },
-    UpdateExpression: 'REMOVE householdId',
-  }));
+  // Refuse to reduce the household below one member. The caller counts, so
+  // with self-removal already blocked we expect at least 2 members here —
+  // this guard catches data-integrity edge cases (e.g. stale caller context).
+  const members = await getHouseholdMembers(householdId);
+  if (members.length <= 1) {
+    return { statusCode: 400, error: 'Cannot remove the last member of a household' };
+  }
+
+  // Remove household association. The conditional ensures we don't race
+  // with another concurrent remove that already moved this user out.
+  try {
+    await ddb.send(new UpdateCommand({
+      TableName: Tables.users,
+      Key: { userId: body.userId },
+      UpdateExpression: 'REMOVE householdId',
+      ConditionExpression: 'householdId = :hid',
+      ExpressionAttributeValues: { ':hid': householdId },
+    }));
+  } catch (err: any) {
+    if (err?.name === 'ConditionalCheckFailedException') {
+      return { statusCode: 409, error: 'User is no longer a member of this household' };
+    }
+    throw err;
+  }
 
   return { statusCode: 200, data: { removed: true } };
 }

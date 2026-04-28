@@ -3,3 +3,15 @@ dist/
 cdk.out/
 .env
 *.js.map
+coverage/
+
+# macOS / IDE cruft
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+
+# CDK deployment outputs — contains AWS account ID, API URLs, Cognito IDs.
+# Regenerated on every deploy; must not be committed.
+cdk-outputs.json

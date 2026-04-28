@@ -23,10 +23,11 @@ export class AuthStack extends cdk.Stack {
         givenName: { required: true, mutable: true },
       },
       passwordPolicy: {
-        minLength: 8,
+        minLength: 12,
         requireUppercase: true,
+        requireLowercase: true,
         requireDigits: true,
-        requireSymbols: false,
+        requireSymbols: true,
       },
       accountRecovery: cognito.AccountRecovery.EMAIL_ONLY,
       removalPolicy: cdk.RemovalPolicy.RETAIN,
@@ -53,7 +54,12 @@ export class AuthStack extends cdk.Stack {
       userPool: this.userPool,
       userPoolClientName: 'dog-tracker-web-client',
       generateSecret: false,
-      authFlows: { userPassword: true, userSrp: true },
+      // userSrp only — userPassword flow transmits the password in the clear
+      // inside the request body and is not needed by Amplify's default client.
+      authFlows: { userSrp: true },
+      // Return the same generic error for "unknown user" and "bad password"
+      // so attackers can't enumerate registered emails.
+      preventUserExistenceErrors: true,
       oAuth: {
         flows: { authorizationCodeGrant: true },
         scopes: [cognito.OAuthScope.EMAIL, cognito.OAuthScope.OPENID, cognito.OAuthScope.PROFILE],

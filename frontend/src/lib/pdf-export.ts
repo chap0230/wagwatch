@@ -122,5 +122,5 @@ export function exportVetReportPdf(
     });
   }
 
-  doc.save(`${dog.name}-health-report-${startDate}-to-${endDate}.pdf`);
+  doc.save(`${dog.name.replace(/[\\/\x00-\x1f]/g, '_').slice(0, 80)}-health-report-${startDate}-to-${endDate}.pdf`);
 }

@@ -1,1 +1,23 @@
 @import "tailwindcss";
+
+/*
+ * datetime-local inputs on mobile have intrinsic widths larger than narrow
+ * phone screens and ignore width constraints because of native `appearance`
+ * styling. Combine four fixes:
+ *   1. appearance:none — lets our width/padding actually apply
+ *   2. width:100%, max-width:100%, min-width:0 — fill the parent, never grow
+ *   3. box-sizing:border-box — padding + border stay inside the width
+ *   4. font-size:16px — stops iOS Safari from zooming the viewport on focus
+ *      (any smaller size triggers zoom, which visually pushes layout around)
+ */
+input[type="datetime-local"],
+input[type="date"],
+input[type="time"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  font-size: 16px;
+}

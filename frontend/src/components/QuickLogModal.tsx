@@ -239,11 +239,8 @@ export default function QuickLogModal({ onSubmit }: QuickLogProps) {
 
               <div>
                 <label className="text-xs text-gray-400 block mb-1">Date &amp; time of event</label>
-                <div className="w-full overflow-hidden">
-                  <input type="datetime-local" value={eventDatetime} onChange={e => setEventDatetime(e.target.value)}
-                    className="w-full min-w-0 px-2 py-2.5 border rounded-lg text-sm"
-                    style={{ maxWidth: '100%', boxSizing: 'border-box' }} />
-                </div>
+                <input type="datetime-local" value={eventDatetime} onChange={e => setEventDatetime(e.target.value)}
+                  className="px-2 py-2.5 border rounded-lg" />
               </div>
 
               <button onClick={handleSubmit} disabled={loading}

@@ -4,17 +4,41 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { v4 as uuid } from 'uuid';
 import { RequestContext } from '../auth-context';
+import {
+  LIMITS,
+  validateString,
+  validateOptionalString,
+  validateOptionalEmail,
+  validateOptionalPhone,
+  validateOptionalWeight,
+  validateOptionalStringList,
+  validateIsoDate,
+  firstError,
+} from '../validation';
 
 const s3 = new S3Client({});
 const PHOTOS_BUCKET = process.env.PHOTOS_BUCKET!;
 
-const REQUIRED_FIELDS = ['name', 'breed', 'dateOfBirth'] as const;
+const ALLOWED_PHOTO_TYPES = new Set(['image/jpeg', 'image/png']);
+
+function validateDogBody(body: any): string | null {
+  return firstError([
+    validateString(body?.name, 'name', LIMITS.shortText),
+    validateString(body?.breed, 'breed', LIMITS.shortText),
+    validateIsoDate(body?.dateOfBirth, 'dateOfBirth'),
+    validateOptionalWeight(body?.weight, 'weight'),
+    validateOptionalString(body?.vetName, 'vetName', LIMITS.shortText),
+    validateOptionalPhone(body?.vetPhone, 'vetPhone'),
+    validateOptionalEmail(body?.vetEmail, 'vetEmail'),
+    validateOptionalStringList(body?.conditions, 'conditions'),
+    validateOptionalStringList(body?.allergies, 'allergies'),
+  ]);
+}
 
 export async function createDog(ctx: RequestContext, body: any) {
   if (!ctx.householdId) return { statusCode: 400, error: 'Must belong to a household first' };
-  for (const f of REQUIRED_FIELDS) {
-    if (!body?.[f]) return { statusCode: 400, error: `${f} is required` };
-  }
+  const err = validateDogBody(body);
+  if (err) return { statusCode: 400, error: err };
 
   const dogId = uuid();
   const item = {
@@ -71,6 +95,21 @@ export async function updateDog(dogId: string, ctx: RequestContext, body: any) {
   if (!existing.Item) return { statusCode: 404, error: 'Dog not found' };
   if (existing.Item.householdId !== ctx.householdId) return { statusCode: 403, error: 'Forbidden' };
 
+  // Validate only fields that are actually present in the update.
+  const checks: (string | null)[] = [];
+  if (body.name !== undefined) checks.push(validateString(body.name, 'name', LIMITS.shortText));
+  if (body.breed !== undefined) checks.push(validateString(body.breed, 'breed', LIMITS.shortText));
+  if (body.dateOfBirth !== undefined) checks.push(validateIsoDate(body.dateOfBirth, 'dateOfBirth'));
+  if (body.weight !== undefined) checks.push(validateOptionalWeight(body.weight, 'weight'));
+  if (body.vetName !== undefined) checks.push(validateOptionalString(body.vetName, 'vetName', LIMITS.shortText));
+  if (body.vetPhone !== undefined) checks.push(validateOptionalPhone(body.vetPhone, 'vetPhone'));
+  if (body.vetEmail !== undefined) checks.push(validateOptionalEmail(body.vetEmail, 'vetEmail'));
+  if (body.conditions !== undefined) checks.push(validateOptionalStringList(body.conditions, 'conditions'));
+  if (body.allergies !== undefined) checks.push(validateOptionalStringList(body.allergies, 'allergies'));
+  if (body.photoKey !== undefined) checks.push(validateOptionalString(body.photoKey, 'photoKey', LIMITS.mediumText));
+  const err = firstError(checks);
+  if (err) return { statusCode: 400, error: err };
+
   const updatable = ['name', 'breed', 'dateOfBirth', 'weight', 'vetName', 'vetPhone', 'vetEmail', 'conditions', 'allergies', 'photoKey'];
   const updates: string[] = [];
   const values: Record<string, any> = {};
@@ -100,6 +139,9 @@ export async function getPhotoUploadUrl(dogId: string, ctx: RequestContext, body
   if (existing.Item.householdId !== ctx.householdId) return { statusCode: 403, error: 'Forbidden' };
 
   const contentType = body?.contentType || 'image/jpeg';
+  if (!ALLOWED_PHOTO_TYPES.has(contentType)) {
+    return { statusCode: 400, error: 'contentType must be image/jpeg or image/png' };
+  }
   const ext = contentType === 'image/png' ? 'png' : 'jpg';
   const key = `${ctx.householdId}/${dogId}/${uuid()}.${ext}`;
 

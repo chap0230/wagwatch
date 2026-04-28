@@ -48,7 +48,9 @@ export default function ChatPage() {
       setSessionId(data.sessionId);
       setMessages(prev => [...prev, { role: 'assistant', text: data.response }]);
     } catch (err: any) {
-      setError('Something went wrong. Please try again.');
+      // Show the backend's error message if it provided one; fall back to a
+      // generic message otherwise.
+      setError(err?.message || 'Something went wrong. Please try again.');
       setMessages(prev => prev.slice(0, -1)); // remove the user message on error
     } finally {
       setLoading(false);

@@ -6,6 +6,7 @@ import * as cognito from 'aws-cdk-lib/aws-cognito';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as iam from 'aws-cdk-lib/aws-iam';
+import * as logs from 'aws-cdk-lib/aws-logs';
 import * as path from 'path';
 
 interface ApiStackProps extends cdk.StackProps {
@@ -33,6 +34,7 @@ export class ApiStack extends cdk.Stack {
       code: lambda.Code.fromAsset(path.join(__dirname, '../../../backend/dist')),
       timeout: cdk.Duration.seconds(15),
       memorySize: 256,
+      logRetention: logs.RetentionDays.ONE_MONTH,
       environment: {
         HOUSEHOLDS_TABLE: props.householdsTable.tableName,
         USERS_TABLE: props.usersTable.tableName,
@@ -61,6 +63,31 @@ export class ApiStack extends cdk.Stack {
         allowMethods: apigateway.Cors.ALL_METHODS,
         allowHeaders: ['Content-Type', 'Authorization'],
       },
+      deployOptions: {
+        // Stage-wide ceiling. Absolute max across all callers; individual
+        // callers are further limited by the usage plan below.
+        throttlingRateLimit: 50,      // requests per second, steady state
+        throttlingBurstLimit: 100,    // short-term burst capacity
+        loggingLevel: apigateway.MethodLoggingLevel.ERROR,
+        metricsEnabled: true,
+        // Per-method throttles — tighter limits on chat endpoints because
+        // each request can fan out to several Bedrock invocations.
+        methodOptions: {
+          '/api/v1/dogs/{dogId}/chat/POST': { throttlingRateLimit: 2, throttlingBurstLimit: 5 },
+          '/api/v1/dogs/{dogId}/chat/sessions/GET': { throttlingRateLimit: 5, throttlingBurstLimit: 10 },
+          '/api/v1/dogs/{dogId}/chat/sessions/{sessionId}/GET': { throttlingRateLimit: 5, throttlingBurstLimit: 10 },
+        },
+      },
+    });
+
+    // Per-API-key usage plan. Not wired to API keys yet (auth is via Cognito),
+    // but leaving the plan here documents the intended throttle profile and
+    // lets you attach keys later if you add machine-to-machine clients.
+    this.api.addUsagePlan('DefaultUsagePlan', {
+      name: 'dog-tracker-default',
+      throttle: { rateLimit: 20, burstLimit: 40 },
+      quota: { limit: 10_000, period: apigateway.Period.DAY },
+      apiStages: [{ api: this.api, stage: this.api.deploymentStage }],
     });
 
     const defaultMethodOptions: apigateway.MethodOptions = {
@@ -121,6 +148,7 @@ export class ApiStack extends cdk.Stack {
       code: lambda.Code.fromAsset(path.join(__dirname, '../../../backend/dist')),
       timeout: cdk.Duration.seconds(60),
       memorySize: 512,
+      logRetention: logs.RetentionDays.ONE_MONTH,
       environment: {
         DOGS_TABLE: props.dogsTable.tableName,
         EVENTS_TABLE: props.eventsTable.tableName,

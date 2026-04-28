@@ -160,11 +160,8 @@ export default function EventDetailModal({ event, onClose, onUpdated, userMap }:
               rows={2} className="w-full px-3 py-2 border rounded-lg text-sm" />
             <div>
               <label className="text-xs text-gray-400 block mb-1">Date &amp; Time</label>
-              <div className="w-full overflow-hidden">
-                <input type="datetime-local" value={occurredAt} onChange={e => setOccurredAt(e.target.value)}
-                  className="w-full min-w-0 px-2 py-2 border rounded-lg text-sm"
-                  style={{ maxWidth: '100%', boxSizing: 'border-box' }} />
-              </div>
+              <input type="datetime-local" value={occurredAt} onChange={e => setOccurredAt(e.target.value)}
+                className="px-2 py-2 border rounded-lg" />
             </div>
             <div className="flex gap-2">
               <button onClick={() => setEditing(false)} className="flex-1 py-2 border rounded-lg text-sm">Cancel</button>

@@ -7,7 +7,9 @@ const shared = {
   format: 'cjs',
   outdir: 'dist',
   external: ['@aws-sdk/*'],
-  sourcemap: true,
+  // No source maps in deployed Lambda artifacts — they inflate the bundle
+  // and make it easier to reverse engineer. Enable locally via DEV_BUILD=1.
+  sourcemap: process.env.DEV_BUILD === '1',
   minify: false,
 };
 

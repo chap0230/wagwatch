@@ -1,9 +1,4 @@
 {
-  "DogTrackerStorage": {
-    "ExportsOutputFnGetAttPhotosBucket2AC9D1F0Arn2A944E00": "arn:aws:s3:::dogtrackerstorage-photosbucket2ac9d1f0-qad1nfjheb2g",
-    "ExportsOutputRefPhotosBucket2AC9D1F073D0C9A7": "dogtrackerstorage-photosbucket2ac9d1f0-qad1nfjheb2g",
-    "PhotosBucketName": "dogtrackerstorage-photosbucket2ac9d1f0-qad1nfjheb2g"
-  },
   "DogTrackerDatabase": {
     "ExportsOutputRefEventsD32975C26DE279B4": "dog-tracker-events",
     "ExportsOutputFnGetAttDogs83E93985ArnEF39EF19": "arn:aws:dynamodb:us-west-2:062328975698:table/dog-tracker-dogs",
@@ -23,6 +18,11 @@
     "BucketName": "dogtrackerfrontend-sitebucket397a1860-mfsa1tnphxrg",
     "DistributionUrl": "https://d15c834imshs8e.cloudfront.net",
     "DistributionId": "E2KG94P6VE3D02"
+  },
+  "DogTrackerStorage": {
+    "ExportsOutputFnGetAttPhotosBucket2AC9D1F0Arn2A944E00": "arn:aws:s3:::dogtrackerstorage-photosbucket2ac9d1f0-qad1nfjheb2g",
+    "ExportsOutputRefPhotosBucket2AC9D1F073D0C9A7": "dogtrackerstorage-photosbucket2ac9d1f0-qad1nfjheb2g",
+    "PhotosBucketName": "dogtrackerstorage-photosbucket2ac9d1f0-qad1nfjheb2g"
   },
   "DogTrackerAuth": {
     "ExportsOutputFnGetAttUserPool6BA7E5F2Arn686ACC00": "arn:aws:cognito-idp:us-west-2:062328975698:userpool/us-west-2_CE3AKiT3g",

@@ -2,13 +2,24 @@ import { ddb, Tables } from '../db';
 import { PutCommand, GetCommand, UpdateCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
 import { v4 as uuid } from 'uuid';
 import { RequestContext, verifyDogAccess } from '../auth-context';
+import {
+  LIMITS,
+  validateString,
+  validateOptionalString,
+  firstError,
+} from '../validation';
 
 export async function createMedication(dogId: string, ctx: RequestContext, body: any) {
   if (!ctx.householdId) return { statusCode: 400, error: 'Must belong to a household' };
   if (!await verifyDogAccess(dogId, ctx.householdId)) return { statusCode: 403, error: 'Forbidden' };
-  if (!body?.name) return { statusCode: 400, error: 'name is required' };
-  if (!body?.dosage) return { statusCode: 400, error: 'dosage is required' };
-  if (!body?.frequency) return { statusCode: 400, error: 'frequency is required' };
+
+  const err = firstError([
+    validateString(body?.name, 'name', LIMITS.shortText),
+    validateString(body?.dosage, 'dosage', LIMITS.mediumText),
+    validateString(body?.frequency, 'frequency', LIMITS.mediumText),
+    validateOptionalString(body?.notes, 'notes', LIMITS.longText),
+  ]);
+  if (err) return { statusCode: 400, error: err };
 
   const item = {
     dogId,
@@ -51,6 +62,14 @@ export async function updateMedication(dogId: string, medicationId: string, ctx:
   const existing = await ddb.send(new GetCommand({ TableName: Tables.medications, Key: { dogId, medicationId } }));
   if (!existing.Item) return { statusCode: 404, error: 'Medication not found' };
   if (!await verifyDogAccess(dogId, ctx.householdId)) return { statusCode: 403, error: 'Forbidden' };
+
+  const checks: (string | null)[] = [];
+  if (body.name !== undefined) checks.push(validateString(body.name, 'name', LIMITS.shortText));
+  if (body.dosage !== undefined) checks.push(validateString(body.dosage, 'dosage', LIMITS.mediumText));
+  if (body.frequency !== undefined) checks.push(validateString(body.frequency, 'frequency', LIMITS.mediumText));
+  if (body.notes !== undefined) checks.push(validateOptionalString(body.notes, 'notes', LIMITS.longText));
+  const err = firstError(checks);
+  if (err) return { statusCode: 400, error: err };
 
   const updatable = ['name', 'dosage', 'frequency', 'notes'];
   const updates: string[] = [];

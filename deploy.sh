@@ -1,13 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Senior Dog Health Tracker — Automated Deploy Script
+# Wag Watch — Automated Deploy Script
 # Usage: ./deploy.sh [--region us-west-2]
 
 REGION="${AWS_DEFAULT_REGION:-us-west-2}"
 while [[ $# -gt 0 ]]; do
   case $1 in
     --region) REGION="$2"; shift 2 ;;
+    -h|--help)
+      echo "Usage: $0 [--region <aws-region>]"
+      echo "Defaults: region=us-west-2 (or \$AWS_DEFAULT_REGION if set)"
+      exit 0 ;;
     *) echo "Unknown option: $1"; exit 1 ;;
   esac
 done
@@ -19,12 +23,19 @@ echo "🐾 Wag Watch — Deploy"
 echo "   Region: $REGION"
 echo ""
 
-# Check prerequisites
+# --- Prerequisites ---
 echo "📋 Checking prerequisites..."
-command -v node >/dev/null 2>&1 || { echo "❌ Node.js is required. Install from https://nodejs.org"; exit 1; }
-command -v aws >/dev/null 2>&1 || { echo "❌ AWS CLI is required. Install from https://aws.amazon.com/cli/"; exit 1; }
+command -v node >/dev/null 2>&1 || { echo "❌ Node.js 20+ is required. Install from https://nodejs.org"; exit 1; }
+command -v npm  >/dev/null 2>&1 || { echo "❌ npm is required. It ships with Node.js."; exit 1; }
+command -v aws  >/dev/null 2>&1 || { echo "❌ AWS CLI is required. Install from https://aws.amazon.com/cli/"; exit 1; }
 
-# Verify AWS credentials
+NODE_MAJOR=$(node --version | sed 's/^v//' | cut -d. -f1)
+if [ "$NODE_MAJOR" -lt 20 ]; then
+  echo "❌ Node.js $NODE_MAJOR is too old. Install Node.js 20 or newer."
+  exit 1
+fi
+
+# --- AWS credentials ---
 echo "🔑 Verifying AWS credentials..."
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text 2>/dev/null) || {
   echo "❌ AWS credentials not configured. Run 'aws configure' first."
@@ -33,82 +44,86 @@ ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text 2>/dev/nu
 export CDK_DEFAULT_ACCOUNT="$ACCOUNT_ID"
 echo "   Account: $ACCOUNT_ID"
 
-# Install dependencies
+# --- Bedrock model access check (non-fatal warning) ---
+echo "🤖 Checking Bedrock Claude access in $REGION..."
+if ! aws bedrock list-foundation-models --region "$REGION" --by-provider anthropic \
+     --query "modelSummaries[?contains(modelId, 'claude-haiku-4-5')].modelId" --output text 2>/dev/null | grep -q claude; then
+  echo "   ⚠️  Claude Haiku 4.5 does not appear to be available or enabled in $REGION."
+  echo "   The app deploys fine, but the AI chat feature will fail until you enable it at:"
+  echo "   https://$REGION.console.aws.amazon.com/bedrock/home?region=$REGION#/modelaccess"
+fi
+
+# --- Install ---
 echo ""
 echo "📦 Installing dependencies..."
-cd "$ROOT_DIR/backend" && npm install --silent
-cd "$ROOT_DIR/frontend" && npm install --silent
-cd "$ROOT_DIR/cdk" && npm install --silent
+(cd "$ROOT_DIR/backend"  && npm install --silent)
+(cd "$ROOT_DIR/frontend" && npm install --silent)
+(cd "$ROOT_DIR/cdk"      && npm install --silent)
 
-# Build backend
+# --- Build backend ---
 echo ""
 echo "🔨 Building backend..."
-cd "$ROOT_DIR/backend" && npm run build
+(cd "$ROOT_DIR/backend" && npm run build)
 
-# Bootstrap CDK (idempotent)
+# --- Bootstrap CDK (idempotent) ---
 echo ""
 echo "☁️  Bootstrapping CDK..."
-cd "$ROOT_DIR/cdk" && npx cdk bootstrap "aws://$ACCOUNT_ID/$REGION" 2>&1 | grep -E "(✅|already)" || true
+(cd "$ROOT_DIR/cdk" && npx cdk bootstrap "aws://$ACCOUNT_ID/$REGION" 2>&1 | grep -E "(✅|already)" || true)
 
-# Deploy infrastructure stacks (without frontend content)
+# --- Deploy infrastructure ---
 echo ""
 echo "🚀 Deploying infrastructure..."
-cd "$ROOT_DIR/cdk"
-npx cdk deploy DogTrackerDatabase DogTrackerAuth DogTrackerStorage DogTrackerApi DogTrackerFrontend \
+OUTPUTS_FILE="$ROOT_DIR/cdk-outputs.json"
+(cd "$ROOT_DIR/cdk" && npx cdk deploy \
+  DogTrackerDatabase DogTrackerAuth DogTrackerStorage DogTrackerApi DogTrackerFrontend \
   --require-approval never \
-  --outputs-file "$ROOT_DIR/cdk-outputs.json" 2>&1 | grep -E "(✅|FAILED|error)" || true
+  --outputs-file "$OUTPUTS_FILE")
 
-# Check for deployment failure
-if [ ! -f "$ROOT_DIR/cdk-outputs.json" ]; then
-  echo "❌ Deployment failed. Check the output above for errors."
+if [ ! -f "$OUTPUTS_FILE" ]; then
+  echo "❌ Deployment failed — $OUTPUTS_FILE was not written."
   exit 1
 fi
 
-# Extract outputs and generate frontend .env
+# --- Extract outputs without Python ---
+# `aws cloudformation describe-stacks` returns outputs as JSON; parse with
+# plain shell to avoid a Python dependency.
 echo ""
 echo "⚙️  Configuring frontend..."
-python3 - "$ROOT_DIR/cdk-outputs.json" "$ROOT_DIR/frontend/.env" << 'PYEOF'
-import json, sys
-with open(sys.argv[1]) as f:
-    outputs = json.load(f)
+get_output() {
+  local stack="$1" key="$2"
+  aws cloudformation describe-stacks --stack-name "$stack" --region "$REGION" \
+    --query "Stacks[0].Outputs[?OutputKey=='$key'].OutputValue | [0]" --output text 2>/dev/null
+}
 
-auth = outputs.get("DogTrackerAuth", {})
-api = outputs.get("DogTrackerApi", {})
-frontend = outputs.get("DogTrackerFrontend", {})
+USER_POOL_ID=$(get_output DogTrackerAuth UserPoolId)
+CLIENT_ID=$(get_output DogTrackerAuth UserPoolClientId)
+COGNITO_DOMAIN=$(get_output DogTrackerAuth CognitoDomain)
+API_URL=$(get_output DogTrackerApi ApiUrl)
+API_URL="${API_URL%/}"  # trim trailing slash
 
-user_pool_id = auth.get("UserPoolId", "")
-client_id = auth.get("UserPoolClientId", "")
-cognito_domain = auth.get("CognitoDomain", "")
-api_url = api.get("ApiUrl", "").rstrip("/")
+cat > "$ROOT_DIR/frontend/.env" <<EOF
+VITE_USER_POOL_ID=$USER_POOL_ID
+VITE_USER_POOL_CLIENT_ID=$CLIENT_ID
+VITE_COGNITO_DOMAIN=$COGNITO_DOMAIN
+VITE_API_URL=$API_URL
+EOF
 
-env_content = f"""VITE_USER_POOL_ID={user_pool_id}
-VITE_USER_POOL_CLIENT_ID={client_id}
-VITE_COGNITO_DOMAIN={cognito_domain}
-VITE_API_URL={api_url}
-"""
+echo "   User Pool ID:   $USER_POOL_ID"
+echo "   Client ID:      $CLIENT_ID"
+echo "   Cognito Domain: $COGNITO_DOMAIN"
+echo "   API URL:        $API_URL"
 
-with open(sys.argv[2], "w") as f:
-    f.write(env_content)
-
-print(f"   User Pool ID:  {user_pool_id}")
-print(f"   Client ID:     {client_id}")
-print(f"   Cognito Domain:{cognito_domain}")
-print(f"   API URL:       {api_url}")
-PYEOF
-
-# Build frontend with real config
+# --- Build frontend ---
 echo ""
 echo "🔨 Building frontend..."
-cd "$ROOT_DIR/frontend" && npm run build
+(cd "$ROOT_DIR/frontend" && npm run build)
 
-# Redeploy frontend with built assets
+# --- Redeploy frontend bucket ---
 echo ""
 echo "🚀 Deploying frontend assets..."
-cd "$ROOT_DIR/cdk"
-npx cdk deploy DogTrackerFrontend --require-approval never 2>&1 | grep -E "(✅|FAILED)" || true
+(cd "$ROOT_DIR/cdk" && npx cdk deploy DogTrackerFrontend --require-approval never)
 
-# Extract final URL
-SITE_URL=$(python3 -c "import json; print(json.load(open('$ROOT_DIR/cdk-outputs.json')).get('DogTrackerFrontend',{}).get('DistributionUrl',''))" 2>/dev/null)
+SITE_URL=$(get_output DogTrackerFrontend DistributionUrl)
 
 echo ""
 echo "════════════════════════════════════════════"
@@ -123,6 +138,6 @@ echo "  1. Open $SITE_URL on your phone"
 echo "  2. Create an account and set up your household"
 echo "  3. Add your dog and start tracking!"
 echo ""
-echo "  Optional: Enable Bedrock Claude model access"
-echo "  in the AWS Console for AI chat features."
+echo "  If AI chat errors out, enable Bedrock Claude Haiku 4.5 here:"
+echo "  https://$REGION.console.aws.amazon.com/bedrock/home?region=$REGION#/modelaccess"
 echo "════════════════════════════════════════════"

@@ -20,6 +20,10 @@ export class DatabaseStack extends cdk.Stack {
       pointInTimeRecoverySpecification: { pointInTimeRecoveryEnabled: true },
       removalPolicy: cdk.RemovalPolicy.RETAIN,
     });
+    this.householdsTable.addGlobalSecondaryIndex({
+      indexName: 'inviteCode-index',
+      partitionKey: { name: 'inviteCode', type: dynamodb.AttributeType.STRING },
+    });
 
     this.usersTable = new dynamodb.Table(this, 'Users', {
       tableName: 'dog-tracker-users',
@@ -74,6 +78,12 @@ export class DatabaseStack extends cdk.Stack {
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       timeToLiveAttribute: 'ttl',
       removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+    // Lets a user list their chat sessions for a given dog without a Scan.
+    this.chatSessionsTable.addGlobalSecondaryIndex({
+      indexName: 'userId-dogId-index',
+      partitionKey: { name: 'userId', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'dogId', type: dynamodb.AttributeType.STRING },
     });
   }
 }

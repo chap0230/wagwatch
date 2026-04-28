@@ -15,7 +15,14 @@ const env = {
 
 const databaseStack = new DatabaseStack(app, 'DogTrackerDatabase', { env });
 const frontendStack = new FrontendStack(app, 'DogTrackerFrontend', { env });
-const storageStack = new StorageStack(app, 'DogTrackerStorage', { env });
+
+// Origins allowed to PUT/GET photos and call the API via the browser.
+const appOrigins = [frontendStack.distributionUrl, 'http://localhost:5173'];
+
+const storageStack = new StorageStack(app, 'DogTrackerStorage', {
+  env,
+  allowedOrigins: appOrigins,
+});
 
 // Auth stack gets the CloudFront URL as a callback
 const authStack = new AuthStack(app, 'DogTrackerAuth', {
@@ -23,7 +30,7 @@ const authStack = new AuthStack(app, 'DogTrackerAuth', {
   callbackUrls: [`${frontendStack.distributionUrl}/`],
 });
 
-const apiStack = new ApiStack(app, 'DogTrackerApi', {
+new ApiStack(app, 'DogTrackerApi', {
   env,
   userPool: authStack.userPool,
   householdsTable: databaseStack.householdsTable,

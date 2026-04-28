@@ -5,8 +5,9 @@
   "scripts": {
     "build": "npm run bundle",
     "bundle": "node esbuild.config.mjs",
-    "typecheck": "tsc --noEmit",
-    "test": "jest"
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
+    "test": "jest",
+    "test:coverage": "jest --coverage"
   },
   "dependencies": {
     "@aws-sdk/client-bedrock-runtime": "^3.1018.0",

@@ -27,7 +27,7 @@ describe('households handler', () => {
       expect(result.statusCode).toBe(201);
       expect(result.data!.name).toBe('Smith Family');
       expect(result.data!.householdId).toBeDefined();
-      expect(result.data!.inviteCode).toHaveLength(8);
+      expect(result.data!.inviteCode).toMatch(/^[A-Za-z0-9_-]{16}$/);
       expect(ddb.send).toHaveBeenCalledTimes(2); // put household + update user
     });
 

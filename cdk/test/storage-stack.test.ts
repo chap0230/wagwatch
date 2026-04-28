@@ -18,12 +18,12 @@ describe('StorageStack', () => {
     });
   });
 
-  it('has CORS configured for PUT and GET', () => {
+  it('has CORS configured for PUT and GET from specific origins', () => {
     template.hasResourceProperties('AWS::S3::Bucket', {
       CorsConfiguration: {
         CorsRules: [{
           AllowedMethods: ['PUT', 'GET'],
-          AllowedOrigins: ['*'],
+          AllowedOrigins: ['http://localhost:5173'],
           AllowedHeaders: ['*'],
         }],
       },

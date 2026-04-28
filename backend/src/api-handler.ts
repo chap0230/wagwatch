@@ -13,12 +13,10 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
     const { httpMethod: method, resource } = event;
     const body = event.body ? JSON.parse(event.body) : {};
     const params = event.pathParameters || {};
-    console.log('API Handler', { method, resource, params });
     // Path parameters from API Gateway may be URL-encoded — decode them
     const decodedParams = Object.fromEntries(
       Object.entries(params).map(([k, v]) => [k, v ? decodeURIComponent(v) : v])
     );
-    console.log('Decoded params', decodedParams);
 
     let result: { statusCode: number; data?: any; error?: string };
 

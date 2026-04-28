@@ -27,3 +27,28 @@ describe('csv-export', () => {
     expect(() => exportMedicationsCsv(meds, 'Bella')).not.toThrow();
   });
 });
+
+import { __test } from '../lib/csv-export';
+
+describe('csv formula injection defense', () => {
+  const { sanitizeCell } = __test;
+
+  it.each([
+    ['=HYPERLINK("http://x","x")', "'=HYPERLINK(\"http://x\",\"x\")"],
+    ['+cmd|calc', "'+cmd|calc"],
+    ['-2+3', "'-2+3"],
+    ['@SUM(A1:A5)', "'@SUM(A1:A5)"],
+    ['\tfoo', "'\tfoo"],
+    ['\rfoo', "'\rfoo"],
+  ])('prefixes dangerous leading char in %s', (input, expected) => {
+    expect(sanitizeCell(input)).toBe(expected);
+  });
+
+  it('leaves safe values alone', () => {
+    expect(__test.sanitizeCell('Bella')).toBe('Bella');
+    expect(__test.sanitizeCell('pee — hall')).toBe('pee — hall');
+    expect(__test.sanitizeCell('')).toBe('');
+    expect(__test.sanitizeCell(null)).toBe('');
+    expect(__test.sanitizeCell(42)).toBe('42');
+  });
+});
